@@ -7,7 +7,7 @@ import path from "path";
 
 const prisma = new PrismaClient();
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const devices = await prisma.maintenanceDevice.findMany({
       orderBy: {

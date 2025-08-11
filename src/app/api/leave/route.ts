@@ -4,10 +4,8 @@ import fs from "fs/promises";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-// KENDİ PDF DOLDURMA FONKSİYONUNU İMPORT EDİYORUZ
 import { fillPdfFromTemplate } from "@/lib/fillPdfFromTemplate";
 
-// Klasör yolları aynı kalıyor
 const UPLOADS_DIR = path.join(
   process.cwd(),
   "private_uploads",
@@ -15,7 +13,6 @@ const UPLOADS_DIR = path.join(
 );
 const FORMS_DIR = path.join(process.cwd(), "private_uploads", "leave_forms");
 
-// Klasörleri oluşturan yardımcı fonksiyon
 const ensureDirExists = async (dir: string) => {
   try {
     await fs.access(dir);
@@ -24,7 +21,6 @@ const ensureDirExists = async (dir: string) => {
   }
 };
 
-// YENİ İZİN TALEBİ OLUŞTURMA (POST METODU)
 export async function POST(req: NextRequest) {
   try {
     await ensureDirExists(UPLOADS_DIR);
@@ -60,7 +56,6 @@ export async function POST(req: NextRequest) {
       explanation: formData.get("explanation")?.toString() ?? "",
     };
 
-    // Yüklenen dosyayı kaydetme (bu kısım aynı kalıyor)
     let uploadedFilePath: string | null = null;
     if (file && file.size > 0) {
       const timestamp = Date.now();
@@ -72,7 +67,6 @@ export async function POST(req: NextRequest) {
       uploadedFilePath = `leave_uploads/${fileName}`;
     }
 
-    // Veritabanına kaydetme (bu kısım aynı kalıyor)
     const newLeaveRequest = await prisma.leaveRequest.create({
       data: {
         userId: user.id,
@@ -87,13 +81,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // --- PDF OLUŞTURMA İÇİN DOĞRU VERİYİ HAZIRLAMA BÖLÜMÜ ---
     const pdfData = {
       firstName: user.firstName,
       lastName: user.lastName,
       contactInfo: leaveDataFromForm.contactInfo,
       unit: leaveDataFromForm.unit,
-      // Tarihleri ISO formatında gönderiyoruz, çünkü `fillPdfFromTemplate` fonksiyonun öyle bekliyor.
       startDate: leaveDataFromForm.startDateTime
         ? new Date(leaveDataFromForm.startDateTime).toISOString()
         : new Date().toISOString(),
@@ -101,15 +93,12 @@ export async function POST(req: NextRequest) {
         ? new Date(leaveDataFromForm.endDateTime).toISOString()
         : new Date().toISOString(),
       duration: leaveDataFromForm.durationValue,
-      // 'leaveType' anahtarını direkt olarak gönderiyoruz. Fonksiyonun içi bunu halledecek.
       leaveType: leaveDataFromForm.leaveType,
       explanation: leaveDataFromForm.explanation,
     };
 
-    // PDF'i oluştur
     const pdfBuffer = await fillPdfFromTemplate(pdfData);
 
-    // PDF'i kaydetme ve DB'yi güncelleme (bu kısımlar aynı kalıyor)
     const generatedPdfFileName = `izin-formu-${newLeaveRequest.id}.pdf`;
     const generatedPdfPath = path.join(FORMS_DIR, generatedPdfFileName);
     await fs.writeFile(generatedPdfPath, pdfBuffer);
@@ -123,8 +112,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Ön yüze sonucu gönder
-    return new Response(pdfBuffer, {
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: { "Content-Type": "application/pdf" },
       status: 200,
     });
@@ -139,8 +127,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET metodu (bu kısım aynı kalıyor)
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Supplier` ADD COLUMN `puanSayisi` INTEGER NOT NULL DEFAULT 0;

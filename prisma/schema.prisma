@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model RolePermission {
+  roleId       String @map("A")
+  permissionId String @map("B")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("_RolePermissions")
+}
+
+model UserPermission {
+  userId       String @map("A")
+  permissionId String @map("B")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("_UserPermissions")
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  name            String
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+}
+
+model User {
+  id                    String               @id @default(cuid())
+  firstName             String
+  lastName              String
+  username              String               @unique
+  email                 String               @unique
+  password              String
+  roleId                String?
+  role                  Role?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  approved              Boolean              @default(false)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  userPermissions       UserPermission[]
+  purchaseRequests      PurchaseRequest[]
+  leaveRequests         LeaveRequest[]
+  invoices              Invoice[]
+  maintenanceDevices    MaintenanceDevice[]
+  plannedMaintenance    MaintenancePlan[]    @relation("PlannedMaintenance")
+  completedMaintenance  MaintenancePlan[]    @relation("CompletedMaintenance")
+  periodicControls      PeriodicControl[]
+  performedControls     PeriodicControlLog[]
+  faultLogs             FaultLog[]
+  repairedFaultLogs     FaultLog[]           @relation("RepairedBy")
+  submittedIdeas        Idea[]
+  votes                 IdeaVote[]
+  ideaCategoriesCreated IdeaCategory[]       @relation("IdeaCategoryCreator")
+  createdProjectContracts ProjectContract[] // YENİ İLİŞKİ
+}
+
+model LeaveRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  leaveType       String
+  startDate       DateTime
+  endDate         DateTime
+  duration        String
+  unit            String?
+  contactInfo     String?
+  explanation     String?
+  fileUrl         String?
+  approved        Boolean  @default(false)
+  rejected        Boolean  @default(false)
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PurchaseCategory {
+  id       String            @id @default(cuid())
+  name     String            @unique
+  requests PurchaseRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseRequest {
+  id              String            @id @default(cuid())
+  talepEdenId     String
+  user            User              @relation(fields: [talepEdenId], references: [id])
+  birim           String
+  tarih           DateTime          @default(now())
+  malzeme         String
+  malzemeOzellik  String?
+  ihtiyacSebebi   String
+  miktar          Int
+  kategoriId      String?
+  kategori        PurchaseCategory? @relation(fields: [kategoriId], references: [id])
+  offers          Json?
+  approved        Boolean           @default(false)
+  rejected        Boolean           @default(false)
+  rejectionReason String?
+  stage           Int               @default(1)
+  stageLabel      String?
+  selectedOffer   Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  invoices        Invoice[]
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  firmaAdi    String
+  yetkiliKisi String
+  telefon     String
+  email       String
+  puan        Float?   @default(0)
+  puanSayisi  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id              String          @id @default(cuid())
+  purchaseId      String
+  purchase        PurchaseRequest @relation(fields: [purchaseId], references: [id])
+  fileUrl         String
+  amount          Float
+  uploadedById    String?
+  uploadedBy      User?           @relation(fields: [uploadedById], references: [id])
+  approved        Boolean?        @default(false)
+  rejectionReason String?
+  supplierRated   Boolean         @default(false)
+  kdvOrani        Float?
+  kdvTutari       Float?
+  toplamTutar     Float?
+  createdAt       DateTime        @default(now())
+}
+
+model MaintenanceCategory {
+  id      String              @id @default(cuid())
+  name    String              @unique
+  devices MaintenanceDevice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaintenanceDevice {
+  id               String              @id @default(cuid())
+  deviceCode       String              @unique
+  name             String
+  brand            String
+  model            String
+  serialNumber     String              @unique
+  building         String
+  location         String
+  description      String?
+  isActive         Boolean             @default(true)
+  categoryId       String
+  category         MaintenanceCategory @relation(fields: [categoryId], references: [id])
+  addedById        String
+  addedBy          User                @relation(fields: [addedById], references: [id])
+  images           DeviceImage[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  maintenancePlans MaintenancePlan[]
+  periodicControl  PeriodicControl?
+  faultLogs        FaultLog[] // YENİ EKLENEN İLİŞKİ
+}
+
+model DeviceImage {
+  id        String            @id @default(cuid())
+  url       String
+  deviceId  String
+  device    MaintenanceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+}
+
+enum MaintenanceStatus {
+  PLANNED
+  COMPLETED
+}
+
+model MaintenancePlan {
+  id              String            @id @default(cuid())
+  deviceId        String
+  device          MaintenanceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  plannedDate     DateTime
+  completedDate   DateTime?
+  status          MaintenanceStatus @default(PLANNED)
+  planningNotes   String?
+  completionNotes String?
+  plannedById     String
+  plannedBy       User              @relation("PlannedMaintenance", fields: [plannedById], references: [id])
+  completedById   String?
+  completedBy     User?             @relation("CompletedMaintenance", fields: [completedById], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+enum ControlFrequency {
+  FIFTEEN_DAYS
+  MONTHLY
+  TWO_MONTHS
+  QUARTERLY
+  FOUR_MONTHS
+  FIVE_MONTHS
+  SEMI_ANNUALLY
+  SEVEN_MONTHS
+  EIGHT_MONTHS
+  NINE_MONTHS
+  TEN_MONTHS
+  ELEVEN_MONTHS
+  ANNUALLY
+}
+
+model PeriodicControl {
+  id              String               @id @default(cuid())
+  deviceId        String               @unique
+  device          MaintenanceDevice    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  frequency       ControlFrequency
+  nextControlDate DateTime
+  createdById     String
+  createdBy       User                 @relation(fields: [createdById], references: [id])
+  logs            PeriodicControlLog[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model PeriodicControlLog {
+  id            String          @id @default(cuid())
+  controlPlanId String
+  controlPlan   PeriodicControl @relation(fields: [controlPlanId], references: [id], onDelete: Cascade)
+  controlDate   DateTime
+  fileUrl       String
+  notes         String?
+  performedById String
+  performedBy   User            @relation(fields: [performedById], references: [id])
+  createdAt     DateTime        @default(now())
+}
+
+enum DowntimeUnit {
+  HOURS
+  DAYS
+}
+
+model FaultLog {
+  id       String            @id @default(cuid())
+  deviceId String
+  device   MaintenanceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  startDate   DateTime
+  endDate     DateTime?
+  description String    @db.Text
+  actionTaken String    @db.Text
+  notes       String?   @db.Text
+
+  downtimeDuration Int
+  downtimeUnit     DowntimeUnit
+
+  fileUrl String?
+
+  reportedById String
+  reportedBy   User   @relation(fields: [reportedById], references: [id])
+
+  repairedById   String?
+  repairedBy     User?   @relation("RepairedBy", fields: [repairedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  repairedByName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IdeaCategory {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String?  @db.Text
+  submissionEndsAt DateTime // Fikirlerin son gönderim tarihi
+  votingEndsAt     DateTime // Oylamanın son tarihi
+
+  createdById String
+  createdBy   User   @relation("IdeaCategoryCreator", fields: [createdById], references: [id])
+
+  ideas Idea[] // Bu kategorideki fikirler
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Sayfa 2: Kullanıcıların göndereceği fikirler
+model Idea {
+  id          String @id @default(cuid())
+  title       String // Fikrin başlığı
+  description String @db.Text // Fikrin detaylı açıklaması
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  categoryId String
+  category   IdeaCategory @relation(fields: [categoryId], references: [id])
+
+  votes IdeaVote[] // Bu fikre gelen oylar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Sayfa 3: Fikirlere yapılan oylar
+model IdeaVote {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  ideaId String
+  idea   Idea   @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // Bir kullanıcının bir fikre sadece bir kez oy verebilmesini sağlar
+  @@unique([userId, ideaId])
+}
+
+enum InvoiceType {
+  ONE_TIME
+  MONTHLY
+}
+
+// DÜZELTİLMESİ GEREKEN ENUM BURASI
+enum InvoiceStatus {
+  PENDING   // Fatura oluşturuldu, kesilmeyi bekliyor
+  ISSUED    // Fatura kesildi, ödeme bekleniyor
+  RECEIVED  // Ödeme alındı, akademisyene ödenmeyi bekliyor
+  PAID_OUT  // Akademisyene ödeme yapıldı, süreç tamamlandı
+  PAID      // Ödendi (Fatura Takvimi gibi diğer modüller için)
+  OVERDUE   // Vadesi geçmiş (Fatura Takvimi gibi diğer modüller için)
+  CANCELED  // İptal edilmiş
+}
+
+model ProjectContract {
+  id                      String   @id @default(cuid())
+  companyName             String
+  academicianName         String
+  projectNumber           String   @unique
+  projectStartDate        DateTime
+  invoiceStartDate        DateTime
+  
+  invoiceType             InvoiceType
+  invoiceDurationMonths   Int?
+  invoiceAmount           Float?
+
+  companyContractUrl      String
+  academicianContractUrl  String
+  
+  uploadedById            String
+  uploadedBy              User     @relation(fields: [uploadedById], references: [id])
+
+  invoices                ProjectInvoice[]
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// GÜNCEL VE DOĞRU MODEL BURASI
+model ProjectInvoice {
+  id                String        @id @default(cuid())
+  projectContractId String
+  projectContract   ProjectContract @relation(fields: [projectContractId], references: [id], onDelete: Cascade)
+  
+  invoiceDate       DateTime
+  amount            Float?
+  status            InvoiceStatus @default(PENDING)
+  
+  fileUrl           String?
+  paymentDate       DateTime?     
+  
+  // Fatura Takip süreci için eklenen alanlar
+  issuedDate        DateTime?
+  paymentReceivedDate DateTime?
+  academicianPaidDate DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}

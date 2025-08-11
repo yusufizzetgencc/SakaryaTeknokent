@@ -5,10 +5,11 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client"; // Prisma'nın türlerini içe aktarın
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  _request: Request, // Kullanılmayan parametre için underscore eklendi
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
+
   // Rol kontrolü "admin" olarak güncellendi, şemanızda admin rolü varsa bu şekilde kalabilir.
   if (!session || session.user.role !== "admin") {
     return new NextResponse(JSON.stringify({ error: "Yetkiniz yok." }), {
@@ -16,7 +17,8 @@ export async function DELETE(
     });
   }
 
-  const contractId = params.id;
+  // Params'ı await ile resolve ediyoruz
+  const { id: contractId } = await context.params;
 
   try {
     // İlişkili tüm verileri güvenli bir şekilde silmek için transaction kullan
@@ -33,7 +35,6 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 }); // Başarılı, içerik yok
   } catch (error) {
-    // 'error: any' kaldırıldı
     console.error(`Proje (ID: ${contractId}) silinirken hata:`, error);
 
     // Hatanın bilinen bir Prisma hatası olup olmadığını kontrol et

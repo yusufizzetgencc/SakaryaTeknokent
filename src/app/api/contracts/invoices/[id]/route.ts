@@ -11,7 +11,7 @@ async function uploadInvoiceFile(file: File): Promise<string> {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "admin") {
@@ -21,6 +21,9 @@ export async function PATCH(
   }
 
   try {
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
+
     const formData = await request.formData();
     const invoiceFile = formData.get("invoiceFile") as File | null;
     const paymentDate = formData.get("paymentDate") as string;
@@ -35,7 +38,7 @@ export async function PATCH(
     const fileUrl = await uploadInvoiceFile(invoiceFile);
 
     await prisma.projectInvoice.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: "PAID",
         fileUrl: fileUrl,

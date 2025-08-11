@@ -1,16 +1,14 @@
+// src/app/api/suppliers/[id]/route.ts
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-interface Params {
-  params: { id: string };
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const suppliers = await prisma.supplier.findMany({
       orderBy: { firmaAdi: "asc" },
     });
-    return NextResponse.json({ success: true, suppliers }); // success ekledik!
+    return NextResponse.json({ success: true, suppliers });
   } catch (error) {
     console.error("[SUPPLIER_GET]", error);
     return NextResponse.json(
@@ -20,9 +18,9 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { firmaAdi, yetkiliKisi, telefon, email } = await req.json();
+    const { firmaAdi, yetkiliKisi, telefon, email } = await request.json();
 
     if (!firmaAdi || !yetkiliKisi || !telefon || !email) {
       return NextResponse.json({ error: "Eksik alanlar var" }, { status: 400 });
@@ -42,16 +40,24 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PUT(req: Request, { params }: Params) {
+export async function PUT(request: Request) {
   try {
-    const { firmaAdi, yetkiliKisi, telefon, email, puan } = await req.json();
+    // URL'den ID'yi alıyoruz
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").pop();
+    if (!id) {
+      return NextResponse.json({ error: "ID bulunamadı" }, { status: 400 });
+    }
+
+    const { firmaAdi, yetkiliKisi, telefon, email, puan } =
+      await request.json();
 
     if (!firmaAdi || !yetkiliKisi || !telefon || !email) {
       return NextResponse.json({ error: "Eksik alanlar var" }, { status: 400 });
     }
 
     const updatedSupplier = await prisma.supplier.update({
-      where: { id: params.id },
+      where: { id },
       data: { firmaAdi, yetkiliKisi, telefon, email, puan },
     });
 
@@ -65,9 +71,15 @@ export async function PUT(req: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(request: Request) {
   try {
-    await prisma.supplier.delete({ where: { id: params.id } });
+    const url = new URL(request.url);
+    const id = url.pathname.split("/").pop();
+    if (!id) {
+      return NextResponse.json({ error: "ID bulunamadı" }, { status: 400 });
+    }
+
+    await prisma.supplier.delete({ where: { id } });
     return NextResponse.json({ message: "Tedarikçi silindi" });
   } catch (error) {
     console.error("[SUPPLIER_DELETE]", error);

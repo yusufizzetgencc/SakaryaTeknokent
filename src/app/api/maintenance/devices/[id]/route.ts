@@ -10,10 +10,11 @@ const prisma = new PrismaClient();
 // Cihaz durumunu güncelleme (Aktif/Pasif)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   try {
-    const { id } = params;
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
     const body = await req.json();
     const { isActive } = body;
 
@@ -41,11 +42,12 @@ export async function PATCH(
 
 // Cihazı silme
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  _req: NextRequest, // ESLint uyarısı için underscore eklendi
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   try {
-    const { id } = params;
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
 
     // Önce cihazı ve ilişkili resimlerini bul
     const deviceToDelete = await prisma.maintenanceDevice.findUnique({

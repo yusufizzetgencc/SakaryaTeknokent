@@ -4,10 +4,10 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await context.params;
   try {
     const category = await prisma.maintenanceCategory.findUnique({
       where: { id },
@@ -27,12 +27,12 @@ export async function GET(
 }
 
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await context.params;
   try {
-    const body = await req.json();
+    const body = await request.json();
     if (!body.name) {
       return NextResponse.json(
         { error: "Kategori adı zorunludur." },
@@ -53,10 +53,10 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await context.params;
   try {
     await prisma.maintenanceCategory.delete({ where: { id } });
     return new Response(null, { status: 204 });

@@ -4,12 +4,12 @@ import { PrismaClient, MaintenanceStatus } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-    const body = await req.json();
+    const { id } = await context.params;
+    const body = await request.json();
     const { completedDate, completionNotes, completedById } = body;
 
     if (!completedDate || !completedById) {

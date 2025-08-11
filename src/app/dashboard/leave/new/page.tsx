@@ -88,55 +88,47 @@ export default function NewLeavePage() {
     setSubmitting(true);
     try {
       const formData = new FormData();
+      // Form verilerini FormData'ya ekle
+      // 'file' dahil tüm alanlar
       Object.entries(form).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
           formData.append(key, value as string | Blob);
         }
       });
-      const res = await fetch("/api/leave", { method: "POST", body: formData });
-      const data = await res.json();
+
+      // ARTIK TEK BİR API ÇAĞRISI YAPIYORUZ
+      const res = await fetch("/api/leave", {
+        method: "POST",
+        body: formData,
+      });
+
       if (res.ok) {
+        // BAŞARILI İSE API'DEN PDF BLOB'U GELİYOR
         await Swal.fire({
           icon: "success",
-          title: "Başarılı",
-          text: "İzin talebiniz gönderildi. Şimdi belgeniz hazırlanıyor...",
+          title: "Başarılı!",
+          text: "İzin talebiniz alındı ve belgeniz oluşturuldu.",
           background: "#1a1a1a",
           color: "#ffffff",
           confirmButtonColor: "#3b82f6",
-          timer: 2500,
+          timer: 2000,
           showConfirmButton: false,
         });
-        const userRes = await fetch("/api/leave/my-requests");
-        const userData = await userRes.json();
-        const username =
-          userRes.ok && userData.length > 0 && userData[0].user?.firstName
-            ? `${userData[0].user.firstName} ${userData[0].user.lastName}`
-            : "Kullanıcı";
-        const pdfRes = await fetch("/api/leave/generate-pdf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fullName: username,
-            ...form,
-            duration: form.durationValue,
-          }),
-        });
-        if (pdfRes.ok) {
-          const blob = await pdfRes.blob();
-          setPreviewUrl(URL.createObjectURL(blob));
-        } else {
-          toast.error("PDF önizlemesi oluşturulamadı ancak talebiniz alındı.");
-        }
+
+        const blob = await res.blob();
+        setPreviewUrl(URL.createObjectURL(blob));
       } else {
-        toast.error(data.error || "Hata oluştu.");
+        // HATA DURUMUNU İŞLE
+        const data = await res.json();
+        toast.error(data.error || "Bir hata oluştu.");
       }
-    } catch {
-      toast.error("Sunucu hatası.");
+    } catch (error) {
+      console.error("Submit Error:", error);
+      toast.error("Sunucuya bağlanırken bir hata oluştu.");
     } finally {
       setSubmitting(false);
     }
   };
-  // --- FONKSİYONELLİK DEĞİŞMEDİ ---
 
   const inputBaseClasses =
     "w-full bg-[#1C1C1E] border border-gray-700/80 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 shadow-inner";

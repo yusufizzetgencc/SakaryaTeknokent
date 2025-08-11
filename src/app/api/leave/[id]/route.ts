@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  _req: NextRequest, // ESLint uyarısı için underscore eklendi
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   try {
-    const { id } = params;
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
 
     // İzin talebini user bilgisiyle birlikte getir
     const leaveRequest = await prisma.leaveRequest.findUnique({

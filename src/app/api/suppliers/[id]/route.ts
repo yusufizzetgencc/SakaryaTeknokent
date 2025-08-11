@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-interface Params {
-  params: { id: string };
-}
-
-export async function PUT(req: Request, { params }: Params) {
+export async function PUT(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { firmaAdi, yetkiliKisi, telefon, email, puan } = await req.json();
+    const { id } = await context.params;
+    const { firmaAdi, yetkiliKisi, telefon, email, puan } =
+      await request.json();
 
     if (!firmaAdi || !yetkiliKisi || !telefon || !email) {
       return NextResponse.json(
@@ -17,7 +18,7 @@ export async function PUT(req: Request, { params }: Params) {
     }
 
     const updatedSupplier = await prisma.supplier.update({
-      where: { id: params.id },
+      where: { id },
       data: { firmaAdi, yetkiliKisi, telefon, email, puan },
     });
 
@@ -35,9 +36,13 @@ export async function PUT(req: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    await prisma.supplier.delete({ where: { id: params.id } });
+    const { id } = await context.params;
+    await prisma.supplier.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "Tedarikçi silindi" });
   } catch (error) {
     console.error("[SUPPLIER_DELETE]", error);

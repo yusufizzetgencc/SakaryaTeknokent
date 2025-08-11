@@ -1,13 +1,13 @@
-// src/app/api/admin/users/[userId]/approve/route.ts
+// src/app/api/admin/users-awaiting/[userId]/approve/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const { userId } = params;
+    const { userId } = await params;
     const { roleId } = await req.json();
 
     if (!roleId) {
@@ -33,7 +33,10 @@ export async function POST(
 
     return NextResponse.json({ message: "Kullanıcı onaylandı." });
   } catch (error) {
-    console.error("[POST /api/admin/users/[userId]/approve] Error:", error);
+    console.error(
+      "[POST /api/admin/users-awaiting/[userId]/approve] Error:",
+      error
+    );
     return NextResponse.json({ error: "Onaylama başarısız." }, { status: 500 });
   }
 }

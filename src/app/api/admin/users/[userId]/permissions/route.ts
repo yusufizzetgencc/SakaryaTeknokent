@@ -3,11 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  req: NextRequest,
-  context: { params: { userId: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
 ) {
-  const { params } = await context;
-  const userId = params.userId;
+  const { userId } = await params;
 
   if (!userId) {
     return NextResponse.json(
@@ -47,10 +46,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  context: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
-  const { params } = context;
-  const userId = params.userId;
+  const { userId } = await params;
 
   try {
     const { permissionIds } = await request.json();

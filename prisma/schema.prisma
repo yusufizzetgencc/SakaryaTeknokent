@@ -74,6 +74,7 @@ model User {
   createdProjectContracts ProjectContract[] // YENİ İLİŞKİ
 }
 
+
 model LeaveRequest {
   id              String   @id @default(cuid())
   userId          String
@@ -85,7 +86,9 @@ model LeaveRequest {
   unit            String?
   contactInfo     String?
   explanation     String?
-  fileUrl         String?
+  uploadedFileUrl String?
+  generatedFormUrl String?
+
   approved        Boolean  @default(false)
   rejected        Boolean  @default(false)
   rejectionReason String?

@@ -11,10 +11,12 @@ import {
   FiClock,
   FiAlertCircle,
   FiDownload,
+  FiEye,
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Interface'i, yeni veritabanı alanlarını içerecek şekilde güncelliyoruz
 interface User {
   firstName: string;
   lastName: string;
@@ -34,7 +36,8 @@ interface LeaveRequest {
   unit?: string | null;
   contactInfo?: string | null;
   explanation?: string | null;
-  fileUrl?: string | null;
+  uploadedFileUrl?: string | null; // Yeni alan
+  generatedFormUrl?: string | null; // Yeni alan
   createdAt: string;
   updatedAt: string;
   user: User;
@@ -48,11 +51,10 @@ export default function LeaveDetailPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
 
-  // --- FONKSİYONELLİK DEĞİŞMEDİ ---
   const [leave, setLeave] = useState<LeaveRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchLeave() {
@@ -65,19 +67,19 @@ export default function LeaveDetailPage({ params }: Props) {
         const data: LeaveRequest = await res.json();
         setLeave(data);
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Bilinmeyen hata");
-        }
+        setError(
+          err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu"
+        );
       } finally {
         setLoading(false);
       }
     }
     fetchLeave();
   }, [id]);
-  // --- FONKSİYONELLİK DEĞİŞMEDİ ---
 
+  // --- HATA ÇÖZÜMÜ BURADA BAŞLIYOR ---
+
+  // 1. Veri yükleniyorsa, yükleme ekranını göster.
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black flex items-center justify-center">
@@ -93,6 +95,7 @@ export default function LeaveDetailPage({ params }: Props) {
     );
   }
 
+  // 2. Bir hata oluştuysa veya `leave` verisi hala null ise (fetch başarısız olduysa), hata ekranını göster.
   if (error || !leave) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black flex items-center justify-center text-center">
@@ -114,6 +117,7 @@ export default function LeaveDetailPage({ params }: Props) {
     );
   }
 
+  // 3. Bu noktadan sonra `leave` nesnesinin `null` olmadığından eminiz. Artık güvenle özelliklerine erişebiliriz.
   const statusInfo = leave.approved
     ? {
         text: "Onaylandı",
@@ -131,6 +135,8 @@ export default function LeaveDetailPage({ params }: Props) {
         classes: "bg-yellow-500/20 text-yellow-300",
         icon: <FiClock />,
       };
+
+  // --- HATA ÇÖZÜMÜ BURADA BİTİYOR ---
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-black via-gray-900 to-black p-4 sm:p-8">
@@ -213,7 +219,7 @@ export default function LeaveDetailPage({ params }: Props) {
             </div>
           </motion.section>
 
-          {/* İzin Detayları ve Dosya */}
+          {/* İzin Detayları Kartı */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -263,50 +269,110 @@ export default function LeaveDetailPage({ params }: Props) {
                 </p>
               </div>
             </div>
-
-            {/* Dosya Bölümü */}
-            {leave.fileUrl && (
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <FiFileText />
-                  Ekli Dosya
-                </h3>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setShowFilePreview(!showFilePreview)}
-                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    {showFilePreview ? <FiXCircle /> : <FiFileText />}
-                    {showFilePreview ? "Önizlemeyi Kapat" : "Önizle"}
-                  </button>
-                  <a
-                    href={leave.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="inline-flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-4 py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    <FiDownload /> İndir
-                  </a>
-                </div>
-              </div>
-            )}
           </motion.section>
+
+          {/* GÜNCELLENMİŞ BELGELER BÖLÜMÜ */}
+          {(leave.uploadedFileUrl || leave.generatedFormUrl) && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 sm:p-8"
+            >
+              <h2 className="text-2xl font-semibold mb-4 text-white flex items-center gap-3">
+                <FiFileText /> Belgeler
+              </h2>
+              <div className="space-y-4">
+                {/* Kullanıcının Yüklediği Dosya */}
+                {leave.uploadedFileUrl && (
+                  <div className="bg-black/20 p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-white/90">
+                        Ekli Dosya (Yüklenen)
+                      </p>
+                      <p className="text-xs text-white/50">
+                        {leave.uploadedFileUrl.split("-").slice(2).join("-")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() =>
+                          setPreviewUrl(
+                            `/api/private-file/${leave.uploadedFileUrl}`
+                          )
+                        }
+                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg font-semibold transition-colors"
+                      >
+                        <FiEye /> Önizle
+                      </button>
+                      <a
+                        href={`/api/private-file/${leave.uploadedFileUrl}`}
+                        download
+                        className="inline-flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-3 py-2 rounded-lg font-semibold transition-colors"
+                      >
+                        <FiDownload /> İndir
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sistem Tarafından Oluşturulan Form */}
+                {leave.generatedFormUrl && (
+                  <div className="bg-black/20 p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-white/90">
+                        İzin Formu (Oluşturulan)
+                      </p>
+                      <p className="text-xs text-white/50">
+                        {leave.generatedFormUrl.split("/")[1]}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() =>
+                          setPreviewUrl(
+                            `/api/private-file/${leave.generatedFormUrl}`
+                          )
+                        }
+                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg font-semibold transition-colors"
+                      >
+                        <FiEye /> Önizle
+                      </button>
+                      <a
+                        href={`/api/private-file/${leave.generatedFormUrl}`}
+                        download
+                        className="inline-flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-3 py-2 rounded-lg font-semibold transition-colors"
+                      >
+                        <FiDownload /> İndir
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.section>
+          )}
 
           {/* Önizleme iframe'i */}
           <AnimatePresence>
-            {showFilePreview && leave.fileUrl && (
+            {previewUrl && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "600px" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
+                className="relative overflow-hidden"
               >
                 <iframe
-                  src={leave.fileUrl}
+                  src={previewUrl}
                   className="w-full h-full rounded-2xl border border-white/10"
                   title="Dosya Önizleme"
                 />
+                <button
+                  onClick={() => setPreviewUrl(null)}
+                  className="absolute top-4 right-4 bg-black/50 hover:bg-black/80 text-white rounded-full p-2 transition-all"
+                  aria-label="Önizlemeyi kapat"
+                >
+                  <FiXCircle size={24} />
+                </button>
               </motion.div>
             )}
           </AnimatePresence>

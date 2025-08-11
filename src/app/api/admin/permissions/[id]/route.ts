@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
 
   if (!id) {
     return NextResponse.json(
@@ -15,7 +15,6 @@ export async function DELETE(
   }
 
   try {
-    // Önce yetkinin varlığını kontrol et
     const existingPermission = await prisma.permission.findUnique({
       where: { id },
     });
@@ -24,7 +23,6 @@ export async function DELETE(
       return NextResponse.json({ error: "Yetki bulunamadı." }, { status: 404 });
     }
 
-    // Yetkiyi sil
     await prisma.permission.delete({ where: { id } });
 
     return NextResponse.json({ message: "Yetki başarıyla silindi." });

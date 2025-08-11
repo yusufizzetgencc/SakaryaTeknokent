@@ -15,9 +15,9 @@ export async function GET() {
 }
 
 // POST: Yeni kategori ekle
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { name } = await req.json();
+    const { name } = await request.json();
 
     if (!name) {
       return NextResponse.json(
@@ -46,52 +46,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[CATEGORY_POST]", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
-  }
-}
-
-// PUT: Kategori güncelle
-export async function PUT(req: Request, context: { params: { id: string } }) {
-  try {
-    const { params } = await context;
-    const id = params.id;
-    const { name } = await req.json();
-
-    if (!name) {
-      return NextResponse.json(
-        { error: "Kategori adı gerekli" },
-        { status: 400 }
-      );
-    }
-
-    const updatedCategory = await prisma.purchaseCategory.update({
-      where: { id },
-      data: { name },
-    });
-
-    return NextResponse.json({
-      message: "Kategori güncellendi",
-      category: updatedCategory,
-    });
-  } catch (error) {
-    console.error("[CATEGORY_PUT]", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
-  }
-}
-
-// DELETE: Kategori sil
-export async function DELETE(
-  req: Request,
-  context: { params: { id: string } }
-) {
-  try {
-    const { params } = await context;
-    const id = params.id;
-
-    await prisma.purchaseCategory.delete({ where: { id } });
-    return NextResponse.json({ message: "Kategori silindi" });
-  } catch (error) {
-    console.error("[CATEGORY_DELETE]", error);
     return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }
 }

@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/authOptions";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,7 +13,8 @@ export async function PUT(
       return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
     }
 
-    const { id } = params;
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
     const body = await req.json();
     const { action, reason } = body as { action: string; reason?: string };
 

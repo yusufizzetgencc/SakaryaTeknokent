@@ -8,7 +8,7 @@ type AllowedStatus = "ISSUED" | "RECEIVED" | "PAID_OUT";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
   // Yetki kontrolünü daha güvenli hale getirelim (örneğin 'admin' rolünü içerip içermediğine bakalım)
@@ -19,7 +19,9 @@ export async function PATCH(
   }
 
   try {
-    const { id } = params;
+    // Params'ı await ile resolve ediyoruz
+    const { id } = await context.params;
+
     const body = await request.json();
     const { status: nextStatus, date } = body as {
       status: AllowedStatus;

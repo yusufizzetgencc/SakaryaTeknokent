@@ -7,11 +7,10 @@ interface PermissionUpdateBody {
 }
 
 export async function GET(
-  req: Request,
-  context: { params: { roleId: string } }
+  _req: Request,
+  { params }: { params: Promise<{ roleId: string }> }
 ) {
-  const { params } = await context;
-  const roleId = params.roleId;
+  const { roleId } = await params;
 
   if (!roleId) {
     return NextResponse.json(
@@ -48,10 +47,9 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  context: { params: { roleId: string } }
+  { params }: { params: Promise<{ roleId: string }> }
 ) {
-  const { params } = await context;
-  const roleId = params.roleId;
+  const { roleId } = await params;
 
   try {
     const body: PermissionUpdateBody = await req.json();

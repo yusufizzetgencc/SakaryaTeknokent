@@ -5,8 +5,8 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest, // ESLint uyarısı için underscore eklendi
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -16,7 +16,8 @@ export async function GET(
     );
   }
 
-  const categoryId = params.id;
+  // Params'ı await ile resolve ediyoruz
+  const { id: categoryId } = await context.params;
   if (!categoryId) {
     return new NextResponse(
       JSON.stringify({ error: "Geçerli bir kategori ID'si belirtilmelidir." }),
@@ -48,7 +49,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "admin") {
@@ -58,7 +59,8 @@ export async function PUT(
     );
   }
 
-  const categoryId = params.id;
+  // Params'ı await ile resolve ediyoruz
+  const { id: categoryId } = await context.params;
 
   try {
     const body = await request.json();
@@ -109,8 +111,8 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest, // ESLint uyarısı için underscore eklendi
+  context: { params: Promise<{ id: string }> } // Next.js 15 için güncellenmiş parametre yapısı
 ) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "admin") {
@@ -120,7 +122,8 @@ export async function DELETE(
     );
   }
 
-  const categoryId = params.id;
+  // Params'ı await ile resolve ediyoruz
+  const { id: categoryId } = await context.params;
 
   try {
     const ideasInCategory = await prisma.idea.count({

@@ -1,127 +1,94 @@
 import { NextResponse, NextRequest } from "next/server";
-import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ roleId: string }> }
+) {
   try {
-    const { searchParams } = new URL(req.url);
-    const roleId = searchParams.get("roleId");
+    const { roleId } = await params;
 
     if (!roleId) {
       return NextResponse.json(
-        { error: "roleId query parametresi zorunludur." },
+        { error: "roleId parametresi zorunludur." },
         { status: 400 }
       );
     }
 
-    const users = await prisma.user.findMany({
+    // Role permissions'ları getir
+    const rolePermissions = await prisma.rolePermission.findMany({
       where: { roleId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
+      include: {
+        permission: {
+          select: {
+            id: true,
+            key: true,
+            name: true,
+          },
+        },
       },
-      orderBy: { firstName: "asc" },
     });
 
-    return NextResponse.json(users);
+    const permissions = rolePermissions.map((rp) => rp.permission);
+
+    return NextResponse.json(permissions);
   } catch (error) {
-    console.error("[USER_LIST_ERROR]", error);
+    console.error("[ROLE_PERMISSIONS_GET_ERROR]", error);
     return NextResponse.json(
-      { error: "Kullanıcılar alınamadı." },
+      { error: "Role permissions alınamadı." },
       { status: 500 }
     );
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ roleId: string }> }
+) {
   try {
+    const { roleId } = await params;
     const body = await req.json();
-    const { firstName, lastName, username, email, password, roleId, approved } =
-      body;
+    const { permissionIds } = body;
 
-    // Validation
-    if (
-      !firstName?.trim() ||
-      !lastName?.trim() ||
-      !username?.trim() ||
-      !email?.trim() ||
-      !password?.trim() ||
-      !roleId?.trim()
-    ) {
+    if (!roleId) {
       return NextResponse.json(
-        { error: "Tüm alanlar zorunludur ve boş olmamalıdır." },
+        { error: "roleId parametresi zorunludur." },
         { status: 400 }
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!Array.isArray(permissionIds)) {
       return NextResponse.json(
-        { error: "Geçersiz e-posta formatı." },
+        { error: "permissionIds array olmalıdır." },
         { status: 400 }
       );
     }
 
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: email.trim().toLowerCase() },
-          { username: username.trim() },
-        ],
-      },
+    // Önce mevcut role permissions'ları sil
+    await prisma.rolePermission.deleteMany({
+      where: { roleId },
     });
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "Bu email veya kullanıcı adı zaten kayıtlı." },
-        { status: 409 }
-      );
-    }
-
-    // Şifreyi hashle
-    const hashedPassword = await hash(password, 10);
-
-    // Rolün permissions'larını ara tablodan çek (id listesi)
-    const rolePermissions = await prisma.rolePermission.findMany({
-      where: { roleId: roleId.trim() },
-      select: { permissionId: true },
-    });
-
-    // Kullanıcı oluştur
-    const newUser = await prisma.user.create({
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        username: username.trim(),
-        email: email.trim().toLowerCase(),
-        password: hashedPassword,
-        roleId: roleId.trim(),
-        approved: typeof approved === "boolean" ? approved : false,
-      },
-    });
-
-    // Kullanıcının permissions ilişkisini ara tabloya ekle
-    if (rolePermissions.length > 0) {
-      const userPermissionCreates = rolePermissions.map((rp) => ({
-        userId: newUser.id,
-        permissionId: rp.permissionId,
+    // Yeni permissions'ları ekle
+    if (permissionIds.length > 0) {
+      const rolePermissionData = permissionIds.map((permissionId: string) => ({
+        roleId,
+        permissionId,
       }));
 
-      await prisma.userPermission.createMany({
-        data: userPermissionCreates,
+      await prisma.rolePermission.createMany({
+        data: rolePermissionData,
         skipDuplicates: true,
       });
     }
 
-    // Parolayı gizle
-    const { password: _password, ...userWithoutPassword } = newUser;
-    return NextResponse.json(userWithoutPassword);
+    return NextResponse.json({
+      message: "Role permissions başarıyla güncellendi.",
+    });
   } catch (error) {
-    console.error("[USER_CREATE_ERROR]", error);
+    console.error("[ROLE_PERMISSIONS_POST_ERROR]", error);
     return NextResponse.json(
-      { error: "Sunucu hatası, kullanıcı oluşturulamadı." },
+      { error: "Role permissions güncellenemedi." },
       { status: 500 }
     );
   }

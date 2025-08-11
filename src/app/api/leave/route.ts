@@ -1,12 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth/next";
+import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+// KENDİ PDF DOLDURMA FONKSİYONUNU İMPORT EDİYORUZ
+import { fillPdfFromTemplate } from "@/lib/fillPdfFromTemplate";
 
+// Klasör yolları aynı kalıyor
+const UPLOADS_DIR = path.join(
+  process.cwd(),
+  "private_uploads",
+  "leave_uploads"
+);
+const FORMS_DIR = path.join(process.cwd(), "private_uploads", "leave_forms");
+
+// Klasörleri oluşturan yardımcı fonksiyon
+const ensureDirExists = async (dir: string) => {
+  try {
+    await fs.access(dir);
+  } catch {
+    await fs.mkdir(dir, { recursive: true });
+  }
+};
+
+// YENİ İZİN TALEBİ OLUŞTURMA (POST METODU)
 export async function POST(req: NextRequest) {
   try {
+    await ensureDirExists(UPLOADS_DIR);
+    await ensureDirExists(FORMS_DIR);
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
@@ -14,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
+      select: { id: true, approved: true, firstName: true, lastName: true },
     });
 
     if (!user || !user.approved) {
@@ -24,91 +48,118 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-
-    const leaveType = formData.get("leaveType")?.toString() ?? "";
-    const startDateTime = formData.get("startDateTime")?.toString() ?? "";
-    const endDateTime = formData.get("endDateTime")?.toString() ?? "";
-    const durationValue = formData.get("durationValue")?.toString() ?? "";
-    const unit = formData.get("unit")?.toString() ?? "";
-    const contactInfo = formData.get("contactInfo")?.toString() ?? "";
-    const explanation = formData.get("explanation")?.toString() ?? "";
-
     const file = formData.get("file") as File | null;
 
-    let fileUrl: string | null = null;
+    const leaveDataFromForm = {
+      leaveType: formData.get("leaveType")?.toString() ?? "",
+      startDateTime: formData.get("startDateTime")?.toString() ?? "",
+      endDateTime: formData.get("endDateTime")?.toString() ?? "",
+      durationValue: formData.get("durationValue")?.toString() ?? "",
+      unit: formData.get("unit")?.toString() ?? "",
+      contactInfo: formData.get("contactInfo")?.toString() ?? "",
+      explanation: formData.get("explanation")?.toString() ?? "",
+    };
 
+    // Yüklenen dosyayı kaydetme (bu kısım aynı kalıyor)
+    let uploadedFilePath: string | null = null;
     if (file && file.size > 0) {
-      // Yeni klasör: public/uploads/leave
-      const uploadsDir = path.join(process.cwd(), "public", "uploads", "leave");
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // Dosya adını benzersiz yap (timestamp + orijinal isim)
       const timestamp = Date.now();
       const safeFileName = file.name.replace(/\s+/g, "-");
-      const fileName = `${timestamp}-${safeFileName}`;
-
-      const filePath = path.join(uploadsDir, fileName);
-
-      // Dosya bufferını al
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Dosyayı yaz
-      await fs.promises.writeFile(filePath, buffer);
-
-      // URL olarak kaydet (public/uploads/leave/...)
-      fileUrl = `/uploads/leave/${fileName}`;
+      const fileName = `${timestamp}-${user.id}-${safeFileName}`;
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(filePath, buffer);
+      uploadedFilePath = `leave_uploads/${fileName}`;
     }
 
-    const newLeave = await prisma.leaveRequest.create({
+    // Veritabanına kaydetme (bu kısım aynı kalıyor)
+    const newLeaveRequest = await prisma.leaveRequest.create({
       data: {
         userId: user.id,
-        leaveType,
-        startDate: new Date(startDateTime),
-        endDate: new Date(endDateTime),
-        duration: durationValue,
-        unit,
-        contactInfo,
-        explanation,
-        fileUrl,
-        approved: false,
-        rejected: false,
+        leaveType: leaveDataFromForm.leaveType,
+        startDate: new Date(leaveDataFromForm.startDateTime),
+        endDate: new Date(leaveDataFromForm.endDateTime),
+        duration: leaveDataFromForm.durationValue,
+        unit: leaveDataFromForm.unit,
+        contactInfo: leaveDataFromForm.contactInfo,
+        explanation: leaveDataFromForm.explanation,
+        uploadedFileUrl: uploadedFilePath,
       },
     });
 
-    return NextResponse.json({ success: true, leave: newLeave });
+    // --- PDF OLUŞTURMA İÇİN DOĞRU VERİYİ HAZIRLAMA BÖLÜMÜ ---
+    const pdfData = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      contactInfo: leaveDataFromForm.contactInfo,
+      unit: leaveDataFromForm.unit,
+      // Tarihleri ISO formatında gönderiyoruz, çünkü `fillPdfFromTemplate` fonksiyonun öyle bekliyor.
+      startDate: leaveDataFromForm.startDateTime
+        ? new Date(leaveDataFromForm.startDateTime).toISOString()
+        : new Date().toISOString(),
+      endDate: leaveDataFromForm.endDateTime
+        ? new Date(leaveDataFromForm.endDateTime).toISOString()
+        : new Date().toISOString(),
+      duration: leaveDataFromForm.durationValue,
+      // 'leaveType' anahtarını direkt olarak gönderiyoruz. Fonksiyonun içi bunu halledecek.
+      leaveType: leaveDataFromForm.leaveType,
+      explanation: leaveDataFromForm.explanation,
+    };
+
+    // PDF'i oluştur
+    const pdfBuffer = await fillPdfFromTemplate(pdfData);
+
+    // PDF'i kaydetme ve DB'yi güncelleme (bu kısımlar aynı kalıyor)
+    const generatedPdfFileName = `izin-formu-${newLeaveRequest.id}.pdf`;
+    const generatedPdfPath = path.join(FORMS_DIR, generatedPdfFileName);
+    await fs.writeFile(generatedPdfPath, pdfBuffer);
+
+    const generatedFormRelativePath = `leave_forms/${generatedPdfFileName}`;
+
+    await prisma.leaveRequest.update({
+      where: { id: newLeaveRequest.id },
+      data: {
+        generatedFormUrl: generatedFormRelativePath,
+      },
+    });
+
+    // Ön yüze sonucu gönder
+    return new Response(pdfBuffer, {
+      headers: { "Content-Type": "application/pdf" },
+      status: 200,
+    });
   } catch (error) {
     console.error("[API][POST] /api/leave", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    const errorMessage =
+      error instanceof Error ? error.message : "Bilinmeyen sunucu hatası";
+    return NextResponse.json(
+      { error: "Sunucu hatası: " + errorMessage },
+      { status: 500 }
+    );
   }
 }
 
+// GET metodu (bu kısım aynı kalıyor)
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
     }
-
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
-
     if (!user) {
       return NextResponse.json(
         { error: "Kullanıcı bulunamadı" },
         { status: 404 }
       );
     }
-
     const leaves = await prisma.leaveRequest.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       include: { user: { select: { firstName: true, lastName: true } } },
     });
-
     return NextResponse.json(leaves);
   } catch (error) {
     console.error("[API][GET] /api/leave", error);

@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
-export async function PUT(req: Request, context: RouteContext) {
+export async function PUT(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { params } = context;
-    const id = params.id;
-
-    const { name } = await req.json();
+    const { id } = await context.params;
+    const { name } = await request.json();
 
     if (!name) {
       return NextResponse.json(
@@ -36,10 +31,12 @@ export async function PUT(req: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(req: Request, context: RouteContext) {
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { params } = context;
-    const id = params.id;
+    const { id } = await context.params;
 
     await prisma.purchaseCategory.delete({ where: { id } });
     return NextResponse.json({ message: "Kategori silindi" });
